@@ -15,9 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->text('description')->nullable();
-            
-            $table->decimal('price', 10, 2)->nullable(); 
-            
+            $table->string('slug')->unique();
+            $table->decimal('price', 10, 2)->default(0); 
+            $table->string('image')->nullable();
             $table->boolean('is_active')->default(true);
             
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('cascade');

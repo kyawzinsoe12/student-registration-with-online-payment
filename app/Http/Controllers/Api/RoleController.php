@@ -126,11 +126,11 @@ class RoleController extends Controller
 
             return response()->json([
                 "status" => "success",
-                "message" => "user updated successfully!",
+                "message" => "roles updated successfully!",
                 "role"  => $role->name,
                 'permissions'=>$role->permissions->pluck('name'),
             ],200);
-        }catch(\Illuminate\validation\ValidationException $e){
+        }catch(\Illuminate\Validation\ValidationException $e){
             return response()->json([
                 "status"    =>  "error",
                 "message"   => $e->errors(),

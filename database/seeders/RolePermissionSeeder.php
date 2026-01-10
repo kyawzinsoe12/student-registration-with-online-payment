@@ -20,19 +20,29 @@ class RolePermissionSeeder extends Seeder
             'user.edit',
             'user.delete',
             'role.manage',
+
+            'course.view',
+            'course.create',
+            'course.edit',
+            'course.delete',
+
+            'lesson.view',
+            'lesson.create',
+            'lesson.edit',
+            'lesson.delete',
         ];
 
         foreach($permissions as $permission){
-            Permission::firstOrCreate(['name'=>$permission]);
+            Permission::firstOrCreate(['name'=>$permission,'guard_name'=>'api']);
         }
 
-        $admin = Role::firstOrCreate(['name'=>'admin']);
+        $admin = Role::firstOrCreate(['name'=>'admin','guard_name'=>'api']);
         $admin->syncPermissions(Permission::all());
 
-        $teacher=Role::firstOrCreate(['name'=>'teacher']);
+        $teacher=Role::firstOrCreate(['name'=>'teacher','guard_name'=>'api']);
         $teacher->syncPermissions(['user.view','user.create']);
 
-        $student= Role::firstOrCreate(['name'=>'student']);
+        $student= Role::firstOrCreate(['name'=>'student','guard_name'=>'api']);
         $student->syncPermissions(['user.edit']);
     }
 }
