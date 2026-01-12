@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Course extends Model
 {
     protected $fillable = [
+        'major_id',
         'name',
         'description',
         'price',
@@ -27,7 +28,12 @@ class Course extends Model
         return $this->belongsTo(User::class,'updated_by');
     }
 
-    public function lesson()
+    public function major()
+    {
+        return $this->belongsTo(Major::class);
+    }
+
+    public function lessons()
     {
         return $this->hasMany(Lesson::class);
     }

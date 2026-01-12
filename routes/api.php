@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\UserController;
 use App\Http\Controllers\Api\CourseController;
 use App\Http\Controllers\Api\LessonController;
+use App\Http\Controllers\Api\MajorController;
 use App\Http\Controllers\Api\RoleController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //assign user to role and permission
     Route::post('users/{user}/assignRoleAndPermission',[UserController::class,'assignRoleAndPermission']);
 
+    //majors
+    Route::get('majors',[MajorController::class,'index']);
+    Route::post('majors',[MajorController::class,'store']);
+    Route::put('majors/{major}',[MajorController::class,'update']);
+    Route::delete('majors/{major}',[MajorController::class,'destroy']);
     //Courses
     Route::get('/courses',[CourseController::class,'index']);
     Route::get('courses/{course}',[CourseController::class,'show']);

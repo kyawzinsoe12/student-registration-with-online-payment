@@ -8,14 +8,19 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CourseController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
+
+    use AuthorizesRequests;
+
     public function index()
     {
+        $this->authorize('view',Course::class);
         $courses = Course::all();
         return response()->json([
             'status'    =>  'success',
@@ -40,7 +45,9 @@ class CourseController extends Controller
     public function store(Request $request)
     {
         try{
+            $this->authorize('create',Course::class);
             $validated = $request->validate([
+                'major_id'      =>  'required|exists:majors,id',
                 'name'          =>  'required|string|max:255',
                 'description'   =>  'nullable|string|max:255',
                 'price'         =>  'nullable|numeric|min:0',
@@ -53,7 +60,8 @@ class CourseController extends Controller
             }
 
             $course = Course::create([
-                'name'          => $validated['name'],
+                'major_id'      =>  $validated['major_id'],
+                'name'          =>  $validated['name'],
                 'description'   =>  $validated['description'] ?? null,
                 'price'         =>  $validated['price'] ?? 0,
                 'image'         =>  $imagePath,
@@ -65,7 +73,7 @@ class CourseController extends Controller
             return response()->json([
                 'status'    =>  'success',
                 'message'   =>  'course created successfully!',
-                'data'      =>  $course->load('creator:id,name')
+                'data'      =>  $course->load('creator:id,name','major:id,name')
             ],201);
         }catch(\Illuminate\Validation\ValidationException $e){
             return response()->json([
@@ -85,13 +93,8 @@ class CourseController extends Controller
      */
     public function show(Course $course)
     {
-        if(auth()->id() !== $course->created_by){
-            return response()->json([
-                'status'    =>  'error',
-                'message'   =>  'Unauthorized. You do not own this course.'
-            ],403);
-        }
-
+        $this->authorize('view',$course);
+        
         return response()->json([
             'status'    =>  'success',
             'message'   =>  'show '. $course->name . 'details',
@@ -112,13 +115,10 @@ class CourseController extends Controller
      */
     public function update(Request $request, Course $course)
     {
-        if(auth()->id() !== $course->created_by){
-            return response()->json([
-                'status'    =>  'error',
-                'message'   =>  'Unauthorized. You do not own this course.',
-            ],403);
-        }
+        $this->authorize('update',$course);
+
         $validated = $request->validate([
+                'major_id'      =>  'required|exists:majors,id',
                 'name'          =>  'sometimes|string|max:255|unique:courses,name,'.$course->id,
                 'description'   =>  'nullable|string|max:255',
                 'price'         =>  'nullable|numeric|min:0',
@@ -150,12 +150,7 @@ class CourseController extends Controller
      */
     public function destroy(Course $course)
     {
-        if(auth()->id() !== $course->created_by){
-            return response()->json([
-                'status'    =>  'error',
-                'message'   =>  'Unauthorized. You do not own this course.',
-            ],403);
-        }
+        $this->authorize('delete',$course);
 
         if($course->image){
             Storage::disk('public')->delete($course->image);

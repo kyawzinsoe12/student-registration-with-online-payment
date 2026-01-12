@@ -10,25 +10,23 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Client\ResponseSequence;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class LessonController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
+
+    use AuthorizesRequests;
+
     public function index()
     {
-        if(auth()->id() !== $course->created_by){
-                return response()->json([
-                    'status'    =>  'error',
-                    'message'   =>  'Unauthorized. You do not own this course.'
-                ],403);
-        } 
-
-        $lessons = Lesson::with('course:id,name,description')
+        $this->authorize('view',Lesson::class);
+        $lessons = Lesson::with('course:id,name,created_by')
                             ->select('id','course_id','title','slug')
                             ->get();
-        
+
         return response()->json([
                 'status' => 'success',
                 'message' => 'Show all lessons',
@@ -50,13 +48,7 @@ class LessonController extends Controller
     public function store(Request $request,Course $course)
     {
         try{
-
-            if(auth()->id() !== $course->created_by){
-                return response()->json([
-                    'status'    =>  'error',
-                    'message'   =>  'Unauthorized. You do not own this course.'
-                ],403);
-            } 
+            $this->authorize('create',Lesson::class);
 
             $validated = $request->validate([
                 'course_id'     =>  'required|exists:courses,id',
@@ -116,6 +108,7 @@ class LessonController extends Controller
      */
     public function update(Request $request, Lesson $lesson)
     {
+        $this->authorize('update',$lesson);
         $validated = $request->validate([
             'title'         =>  'sometimes|required|string|max:255',
             'content'       =>  'nullable|string|max:255',
@@ -131,7 +124,7 @@ class LessonController extends Controller
 
         $lesson->update($validated);
         return response()->json([
-            'statur'    => 'success',
+            'status'    => 'success',
             'message'   => 'Lesson Update Successfully',
             'data'      =>  $lesson,
         ],200);
@@ -142,12 +135,7 @@ class LessonController extends Controller
      */
     public function destroy(Lesson $lesson)
     {
-        if(auth()->id() !== $lesson->course->created_by){
-            return response()->json([
-                'status'    =>  'error',
-                'message'   =>  'Unauthorized. You do not own this course.'
-            ],403);
-        } 
+        $this->authorize('delete',$lesson);
 
         $lesson->delete();
 

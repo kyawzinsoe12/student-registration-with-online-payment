@@ -21,6 +21,11 @@ class RolePermissionSeeder extends Seeder
             'user.delete',
             'role.manage',
 
+            'major.view',
+            'major.create',
+            'major.edit',
+            'major.delete',
+            
             'course.view',
             'course.create',
             'course.edit',
