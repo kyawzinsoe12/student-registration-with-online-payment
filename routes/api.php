@@ -3,9 +3,11 @@
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\UserController;
 use App\Http\Controllers\Api\CourseController;
+use App\Http\Controllers\Api\EnrollmentController;
 use App\Http\Controllers\Api\LessonController;
 use App\Http\Controllers\Api\MajorController;
 use App\Http\Controllers\Api\RoleController;
+use App\Models\Enrollment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -45,7 +47,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     //Courses
     Route::get('/courses',[CourseController::class,'index']);
     Route::get('courses/{course}',[CourseController::class,'show']);
-    Route::post('/courses',[CourseController::class,'store']);
+    Route::post('majors/{major}/courses',[CourseController::class,'store']);
     Route::put('courses/{course}',[CourseController::class,'update']);
     Route::delete('courses/{course}',[CourseController::class,'destroy']);
 
@@ -55,5 +57,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('courses/{course}/lessons',[LessonController::class,'store']);
     Route::put('lessons/{lesson}',[LessonController::class,'update']);
     Route::delete('lessons/{lesson}',[LessonController::class,'destroy']);
+
+    //Enrollments
+    Route::get('enrollments',[EnrollmentController::class,'index']);
+    Route::post('enrollments',[EnrollmentController::class,'store']);
+    Route::put('enrollments/{enrollment}',[EnrollmentController::class,'update']);
+    Route::patch('enrollments/{enrollment}/cancel',[EnrollmentController::class,'cancel']);
+    Route::delete('enrollments/{enrollment}',[EnrollmentController::class,'destroy']);
     
 });

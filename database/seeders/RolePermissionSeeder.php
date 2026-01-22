@@ -35,6 +35,12 @@ class RolePermissionSeeder extends Seeder
             'lesson.create',
             'lesson.edit',
             'lesson.delete',
+
+            'enrollment.view',
+            'enrollment.create',
+            'enrollment.edit',
+            'enrollment.cancel',
+            'enrollment.delete',
         ];
 
         foreach($permissions as $permission){
