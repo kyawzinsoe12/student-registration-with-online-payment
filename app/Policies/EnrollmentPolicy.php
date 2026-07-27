@@ -66,17 +66,17 @@ class EnrollmentPolicy
             return true;
         }
 
-        // $canDelete = Enrollment::where('user_id',$user->id) 
-        //                         ->where('course_id',$course->id)
-        //                         ->whereIn('status',['pending','cancelled'])
-        //                         ->exists();
+        $canDelete = Enrollment::where('user_id',$user->id) 
+                                ->where('course_id',$course->id)
+                                ->whereIn('status',['pending','cancelled'])
+                                ->exists();
 
-        if($user->id !== $enrollment->user_id){
-            return false;
-        }
-        if(! in_array($enrollment->status,['pending','cancelled'])){
-            return false;
-        }
+        // if($user->id !== $enrollment->user_id){
+        //     return false;
+        // }
+        // if(! in_array($enrollment->status,['pending','cancelled'])){
+        //     return false;
+        // }
         
         return $user->can('enrollment.delete');
     }

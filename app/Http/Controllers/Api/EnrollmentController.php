@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\EnrollmentResource;
 use App\Models\Enrollment;
 use Illuminate\Http\Request;
 
@@ -13,14 +14,11 @@ class EnrollmentController extends Controller
      */
     public function index()
     {
-        $enrollments = Enrollment::with('user:id,name','course:id,name,price')
-                                    ->select('id','user_id','course_id','status')
-                                    ->get();
-        return response()->json([
-            'status'    =>  'success',
-            'message'   =>  'Show all Enroallment',
-            'data'      =>  $enrollments,
-        ],200);
+        $enrollments = Enrollment::with('user:id,name', 'course:id,name,price')
+            ->select('id', 'user_id', 'course_id', 'status')
+            ->get();
+        $data = EnrollmentResource::collection($enrollments);
+        return $this->success('Show All Enrollments.', $data);
     }
 
     /**
@@ -37,33 +35,28 @@ class EnrollmentController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'major_id'  =>  'required|exists:majors,id',
-            'course_id' =>  'required|exists:courses,id',
+            'major_id' => 'required|exists:majors,id',
+            'course_id' => 'required|exists:courses,id',
         ]);
         $user = auth()->id();
-        $alreadyEnrolled = Enrollment::where('user_id',$user)
-                        ->where('course_id',$validated['course_id'])
-                        ->exists();
-        if($alreadyEnrolled){
+        $alreadyEnrolled = Enrollment::where('user_id', $user)
+            ->where('course_id', $validated['course_id'])
+            ->exists();
+        if ($alreadyEnrolled) {
             return response()->json([
-                'status'    =>  'error',
-                'message'   =>  'You are already enrolled for this courese',
-            ],409);
+                'status' => 'error',
+                'message' => 'You are already enrolled for this courese',
+            ], 409);
         }
 
         $enrollment = Enrollment::create([
-            'user_id'   => auth()->id(),
-            'major_id'  =>  $validated['major_id'],
-            'course_id' =>  $validated['course_id'],
-            'status'    =>  'pending',
+            'user_id' => auth()->id(),
+            'major_id' => $validated['major_id'],
+            'course_id' => $validated['course_id'],
+            'status' => 'pending',
         ]);
 
-        return response()->json([
-            'status'    =>  'success',
-            'message'   =>  'Enrolled Successfully!',
-            'data'      =>  $enrollment,
-            'price'     =>  $enrollment->course->price,
-        ],201);
+        return $this->success('Enrolled Created Successfully.', new EnrollmentResource($enrollment), 201);
     }
 
     /**
@@ -88,20 +81,18 @@ class EnrollmentController extends Controller
     public function update(Request $request, Enrollment $enrollment)
     {
         $validated = $request->validate([
-            'status' => 'required|in:pending', 'paid', 'cancelled',
+            'status' => 'required|in:pending,paid,cancelled',
         ]);
 
-        if($validated['status']){
+        if ($validated['status'] === 'paid') {
             $validated['completed_at'] = now();
+        } else {
+            $validated['completed_at'] = null;
         }
 
         $enrollment->update($validated);
 
-        return response()->json([
-            'status'    =>  'success',
-            'message'   =>  'Update Enroll Successfully',
-            'data'      =>  $enrollment,
-        ],201);
+        return $this->success('Enrolled Updated Successfully.', new EnrollmentResource($enrollment));
     }
 
     /**
@@ -110,25 +101,16 @@ class EnrollmentController extends Controller
     public function destroy(Enrollment $enrollment)
     {
         $enrollment->delete();
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Enrollment record deleted permanently.'
-        ], 200);
+        return $this->success('Enrolled Deleted Successfully.');
     }
 
     public function cancel(Enrollment $enrollment)
     {
         $enrollment->update([
-            'status'    =>  'cancelled',
+            'status' => 'cancelled',
         ]);
 
-        return response()->json([
-            'status'    =>  'success',
-            'message'   =>  'Cancel successfully',
-            'data'      =>  [
-                'userInfo' => $enrollment->load('user:id,name'),
-            ]
-        ],203);
+        return $this->success('Enrolled Cancel Successfully.', new EnrollmentResource($enrollment));
     }
 
 

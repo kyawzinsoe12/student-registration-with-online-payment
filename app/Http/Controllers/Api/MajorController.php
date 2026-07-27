@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use App\Http\Resources\MajorResource;
 
 class MajorController extends Controller
 {
@@ -19,13 +20,12 @@ class MajorController extends Controller
     use AuthorizesRequests;
     public function index()
     {
-        $this->authorize('view', Major::class);
-        $majors = Major::select('id','name','description')->get();
-        return response()->json([
-            'status'    => 'success',
-            'message'   => 'Show all Majors',
-            'data'      =>  $majors,
-        ],200);
+        // $this->authorize('view', Major::class);
+        $majors = Major::select('id', 'name', 'description')->get();
+
+        $data = MajorResource::collection($majors);
+
+        return $this->success('Show all Major', $data);
     }
 
     /**
@@ -41,48 +41,35 @@ class MajorController extends Controller
      */
     public function store(Request $request)
     {
-        try{
+        try {
             $this->authorize('create', Major::class);
             $validated = $request->validate([
-                'name'          =>  'required|string|max:255|unique:majors,name',
-                'description'   =>  'nullable|string|max:255',
-                'image'         =>  'nullable|image|mimes:jpeg,png,jpg|max:2048',
+                'name' => 'required|string|max:255|unique:majors,name',
+                'description' => 'nullable|string|max:255',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             ]);
 
             $imagePath = null;
 
-            if($request->hasFile('image')){
-                $imagePath = $request->file('image')->store('majors','public');
+            if ($request->hasFile('image')) {
+                $imagePath = $request->file('image')->store('majors', 'public');
             }
 
             $majors = Major::create([
-                'name'  =>  $validated['name'],
-                'slug'  =>  Str::slug($validated['name']),
-                'description'   =>  $validated['description'] ?? null,
-                'image'         =>  $imagePath,
-                'is_active'     =>  true,
-                'created_by'    => auth()->id(),
+                'name' => $validated['name'],
+                'slug' => Str::slug($validated['name']),
+                'description' => $validated['description'] ?? null,
+                'image' => $imagePath,
+                'is_active' => true,
+                'created_by' => auth()->id(),
             ]);
 
-            return response()->json([
-                'status'    =>  'success',
-                'message'   =>  'Major Creted Successfully',
-                'data'      => [
-                    'name'          =>  $majors->name,
-                    'description'   =>  $majors->description,
-                ]
-            ],203);
+            return $this->success('Major created successfully', new MajorResource($majors), 201);
 
-        }catch(\Illuminate\Validation\ValidationException $e){
-            return response()->json([
-                'status'    =>  'error',
-                'message'   =>  $e->errors(),
-            ],422);
-        }catch(Exception $e){
-            return response()->json([
-                'status'    =>  'error',
-                'message'   =>  $e->getMessage(),
-            ],500);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->error('Validation failed', $e->errors(), 422);
+        } catch (Exception $e) {
+            return $this->error($e->getMessage(), null, 500);
         }
     }
 
@@ -107,32 +94,28 @@ class MajorController extends Controller
      */
     public function update(Request $request, Major $major)
     {
-        $this->authorize('update',$major);
+        $this->authorize('update', $major);
         $validated = $request->validate([
-            'name'          =>  'sometimes|string|max:255|unique:majors,name,'.$major->id,
-            'description'   =>  'nullable|string|max:255',
-            'image'         =>  'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'name' => 'sometimes|string|max:255|unique:majors,name,' . $major->id,
+            'description' => 'nullable|string|max:255',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
         ]);
 
-        if($request->hasFile('image')){
-            if($major->image){
+        if ($request->hasFile('image')) {
+            if ($major->image) {
                 Storage::disk('public')->delete($major->image);
             }
-            $validated['image'] = $request->file('image')->store('majors','public');
+            $validated['image'] = $request->file('image')->store('majors', 'public');
         }
         $validated['updated_by'] = auth()->id();
 
-        if(isset($validated['name'])){
-            $validated['slug']  = Str::slug($validated['name']);
+        if (isset($validated['name'])) {
+            $validated['slug'] = Str::slug($validated['name']);
         }
 
         $major->update($validated);
 
-        return response()->json([
-            'status'    =>  'success',
-            'message'   =>  'Major Updated Successfully!',
-            'data'      => $major
-        ],200);
+        return $this->success('Major Updated Successfully', new MajorResource($major));
     }
 
     /**
@@ -140,15 +123,12 @@ class MajorController extends Controller
      */
     public function destroy(Major $major)
     {
-        $this->authorize('delete',$major);
-        if($major->image){
+        $this->authorize('delete', $major);
+        if ($major->image) {
             Storage::disk('public')->delete($major->image);
         }
         $major->delete();
-            
-        return response()->json([
-            'status'    => 'success',
-            'message'   =>  'Major deleted Successfully!',
-        ],200);
+
+        return $this->success('Major deleted successfully');
     }
 }

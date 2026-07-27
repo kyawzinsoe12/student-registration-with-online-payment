@@ -8,6 +8,7 @@ use App\Models\Lesson;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\LessonResource;
 use Illuminate\Http\Client\ResponseSequence;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -22,16 +23,14 @@ class LessonController extends Controller
 
     public function index()
     {
-        $this->authorize('view',Lesson::class);
+        $this->authorize('view', Lesson::class);
         $lessons = Lesson::with('course:id,name,created_by')
-                            ->select('id','course_id','title','slug')
-                            ->get();
+            ->select('id', 'course_id', 'title', 'slug')
+            ->get();
 
-        return response()->json([
-                'status' => 'success',
-                'message' => 'Show all lessons',
-                'data' => $lessons, 
-        ],200); 
+        $data = LessonResource::collection($lessons);
+
+        return $this->success('Show All Lessons.', $data);
     }
 
     /**
@@ -45,45 +44,35 @@ class LessonController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request,Course $course)
+    public function store(Request $request, Course $course)
     {
-        try{
-            $this->authorize('create',Lesson::class);
+        try {
+            $this->authorize('create', Lesson::class);
 
             $validated = $request->validate([
-                'course_id'     =>  'required|exists:courses,id',
-                'title'         =>  'required|string|max:255',
-                'content'       =>  'nullable|string|max:255',
-                'order'         =>  'nullable|integer|min:1',
+                'course_id' => 'required|exists:courses,id',
+                'title' => 'required|string|max:255',
+                'content' => 'nullable|string|max:255',
+                'order' => 'nullable|integer|min:1',
             ]);
 
             $lesson = Lesson::create([
-                'course_id' =>  $course->id,
-                'title'     =>  $validated['title'],
-                'slug'      =>  Str::slug($validated['title']),
-                'content'   =>  $validated['content'],
-                'order'     =>  $validated['order'] ?? 1,
-                'is_free'   =>  $request->is_free ?? false,
-                'created_by'=>  auth()->id(),
-                'updated_by'=>  auth()->id(),
+                'course_id' => $course->id,
+                'title' => $validated['title'],
+                'slug' => Str::slug($validated['title']),
+                'content' => $validated['content'],
+                'order' => $validated['order'] ?? 1,
+                'is_free' => $request->is_free ?? false,
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
             ]);
 
-            return response()->json([
-                'status'    =>  'success',
-                'message'   =>  'Lesson create Successfully',
-                'data'      =>  $lesson->load('course:id,name'),
-            ],201);
+            return $this->success('Lesson create Successfully', new LessonResource($lesson), 201);
 
-        }catch(\Illuminate\Validation\ValidationException $e){
-            return response()->json([
-                'status'    => 'error',
-                'message'   =>  $e->errors(),
-            ],422);
-        }catch(Exception $e){
-            return response()->json([
-                'status'    => 'error',
-                'message'   =>  $e->getMessage(),
-            ],422);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->error('Validation failed', $e->errors(), 422);
+        } catch (Exception $e) {
+            return $this->error($e->getMessage(), null, 500);
         }
     }
 
@@ -108,14 +97,14 @@ class LessonController extends Controller
      */
     public function update(Request $request, Lesson $lesson)
     {
-        $this->authorize('update',$lesson);
+        $this->authorize('update', $lesson);
         $validated = $request->validate([
-            'title'         =>  'sometimes|required|string|max:255',
-            'content'       =>  'nullable|string|max:255',
-            'order'         =>  'nullable|integer|min:1',
+            'title' => 'sometimes|required|string|max:255',
+            'content' => 'nullable|string|max:255',
+            'order' => 'nullable|integer|min:1',
         ]);
 
-        if(isset($validated['title'])){
+        if (isset($validated['title'])) {
             $validated['slug'] = Str::slug($validated['title']);
         }
 
@@ -123,11 +112,8 @@ class LessonController extends Controller
         $validated['updated_by'] = auth()->id();
 
         $lesson->update($validated);
-        return response()->json([
-            'status'    => 'success',
-            'message'   => 'Lesson Update Successfully',
-            'data'      =>  $lesson,
-        ],200);
+
+        return $this->success('Lesson Update Successfully', new LessonResource($lesson), 201);
     }
 
     /**
@@ -135,14 +121,11 @@ class LessonController extends Controller
      */
     public function destroy(Lesson $lesson)
     {
-        $this->authorize('delete',$lesson);
+        $this->authorize('delete', $lesson);
 
         $lesson->delete();
 
-        return response()->json([
-            'status'  => 'success',
-            'message' => 'Lesson deleted successfully'
-        ]);
+        return $this->success('Lesson deleted successfully');
 
     }
 }
