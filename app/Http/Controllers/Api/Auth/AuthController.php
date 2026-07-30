@@ -2,167 +2,203 @@
 
 namespace App\Http\Controllers\Api\Auth;
 
-use Exception;
-use App\Models\User;
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-// use Illuminate\Container\Attributes\Auth;
-
+use App\Http\Resources\UserResource;
+use App\Models\User;
+use Exception;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-// use League\Config\Exception\ValidationException;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * Register a new user.
+     */
     public function register(Request $request)
     {
-        $validated  = $request->validate([
-            'name'  => 'required|string|max:255',
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'phone' => 'string|max:12',
-            'address'=>'required|string|max:255',
-            'password' => ['required','string', Password::min(8)],
+            'phone' => 'nullable|string|max:20',
+            'address' => 'required|string|max:255',
+            'password' => ['required', Password::defaults()],
         ]);
-        $users = User::create([
-            'name'  =>  $validated['name'],
-            'email' =>  $validated['email'],
-            'phone' =>  $validated['phone'] ?? null,
-            'address'   => $validated['address'] ?? null,
-            'password' => Hash::make($validated['password'])
-        ]);
-        
-        return response()->json([
-            'users' => $users,
-            'status'=> 'success',
-            'message' => 'user created successfully'
-        ],201);
+
+        $validated['email'] = strtolower($validated['email']);
+        $validated['password'] = Hash::make($validated['password']);
+
+        $user = User::create($validated);
+
+        $token = $user->createToken('mobile-app')->plainTextToken;
+
+        return $this->success(
+            'User registered successfully.',
+            [
+                'user' => new UserResource($user),
+                'token' => $token,
+            ],
+            201
+        );
     }
 
+    /**
+     * Login user.
+     */
     public function login(Request $request)
     {
-        $request->validate([
-            'email' =>  'required|email',
-            'password' => ['required','string', Password::min(8)],
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required|string',
         ]);
 
-        $credentials = $request->only('email','password');
+        $credentials['email'] = strtolower($credentials['email']);
 
-        if(!Auth::attempt($credentials)){
+        if (!Auth::attempt($credentials)) {
             throw ValidationException::withMessages([
-                'email' =>  ['Invalid email or password'],
+                'email' => ['Invalid email or password.'],
             ]);
         }
 
-        $user = User::where('email',$request->email)->first();
-        $token = $user->createToken('auth_token')->plainTextToken;
-        return response()->json([
-            "status" => "Success",
-            "message" => "login successfully",
-            "token" => $token,
-        ],200);
+        $user = Auth::user();
+
+        $token = $user->createToken('mobile-app')->plainTextToken;
+
+        return $this->success(
+            'Login successful.',
+            [
+                'user' => new UserResource($user),
+                'token' => $token,
+            ]
+        );
     }
 
+    /**
+     * Send password reset OTP.
+     */
     public function verifyResetPasswordOtp(Request $request)
     {
-        try{
-            $request->validate([
+        try {
+            $validated = $request->validate([
                 'email' => 'required|email|exists:users,email',
             ]);
 
-            $user = User::where('email',$request->email)->first();
+            $validated['email'] = strtolower($validated['email']);
 
-            $putOtp = random_int(100000,999999);
+            $user = User::where('email', $validated['email'])->first();
 
-            Cache::put('rest_otp'.$user->email,$putOtp,now()->addMinutes(5));
+            $otp = random_int(100000, 999999);
 
-            Mail::raw("Your password reset OTP is: $putOtp", function ($message) use ($user) {
-                $message->to($user->email)
+            Cache::put(
+                'rest_otp_' . $user->email,
+                $otp,
+                now()->addMinutes(5)
+            );
+
+            Mail::raw(
+                "Your password reset OTP is: {$otp}",
+                function ($message) use ($user) {
+                    $message->to($user->email)
                         ->subject('Password Reset OTP');
-            });
+                }
+            );
 
-            return response()->json([
-                "status" => "success",
-                "message" => "otp send successfully",
-                "otp" => $putOtp,
-            ],200);
-            
-        }catch(\Illuminate\Validation\ValidationException $e){
-            return response()->json([
-                "status" => "error",
-                "message" => $e->errors(),
-            ],422);
-        }catch(Exception $e){
-            return response()->json([
-                "status" => "error",
-                "message" =>$e->getMessage(),
-            ],500);
+            return $this->success(
+                'OTP sent successfully.',
+                [
+                    // Remove this in production
+                    'otp' => $otp,
+                ]
+            );
+        } catch (ValidationException $e) {
+            return $this->error(
+                'Validation failed.',
+                $e->errors(),
+                422
+            );
+        } catch (Exception $e) {
+            return $this->error(
+                'Something went wrong.',
+                $e->getMessage(),
+                500
+            );
         }
-        
     }
+
+    /**
+     * Reset password.
+     */
     public function resetPassword(Request $request)
     {
-        try{
-            $request->validate([
-                'otp' => 'required|digits:6',
+        try {
+            $validated = $request->validate([
                 'email' => 'required|email|exists:users,email',
-                'password' => 'required|string|min:8',
+                'otp' => 'required|digits:6',
+                'password' => ['required', Password::defaults()],
             ]);
 
-            $user = User::where('email',$request->email)->first();
-            $catchOtp = Cache::get('rest_otp'. $request->email);
+            $validated['email'] = strtolower($validated['email']);
 
-            if(!$user || !$catchOtp || $catchOtp!=$request->otp){
+            $user = User::where('email', $validated['email'])->first();
+
+            $cachedOtp = Cache::get('rest_otp_' . $validated['email']);
+
+            if (!$cachedOtp || $cachedOtp != $validated['otp']) {
                 throw ValidationException::withMessages([
-                    'otp' => ['Invalid Otp or not a valid email! '],
+                    'otp' => ['Invalid or expired OTP.'],
                 ]);
             }
 
-            $user->forceFill([
-                'password' => Hash::make($request->password),
-            ])->save();
+            $user->update([
+                'password' => Hash::make($validated['password']),
+            ]);
 
-            Cache::forget('catch_otp'.$request->email);
+            Cache::forget('rest_otp_' . $validated['email']);
+
+            // Logout from all devices
             $user->tokens()->delete();
 
-            return response()->json([
-                "status" => "success",
-                "message" => "reset password successfully",
-            ],200);
-        }catch(\Illuminate\Validation\ValidationException $e){
-            return response()->json([
-                "status" => "error",
-                "message" => $e->errors(),
-            ],422);
-        }catch(Exception $e){
-            return response()->json([
-                "status" => "error",
-                "message" =>$e->getMessage(),
-            ],500);
+            return $this->success(
+                'Password reset successfully.'
+            );
+        } catch (ValidationException $e) {
+            return $this->error(
+                'Validation failed.',
+                $e->errors(),
+                422
+            );
+        } catch (Exception $e) {
+            return $this->error(
+                'Something went wrong.',
+                $e->getMessage(),
+                500
+            );
         }
     }
 
+    /**
+     * Logout current user.
+     */
     public function logout(Request $request)
     {
         $user = $request->user();
-        $token = $request->user()->currentAccessToken();
-        if($user && $user->currentAccessToken()){
-            $user->tokens()->where('id',$token->id)->delete();
 
-            return response()->json([
-                'status' => 'success',
-                'message' => 'logout successfully!'
-            ],200);
+        if (!$user || !$user->currentAccessToken()) {
+            return $this->error(
+                'Unauthorized or token not found.',
+                null,
+                401
+            );
         }
 
-        return response()->json([
-            'status' => 'error',
-            'message' => 'Unauthorized or token not found'
-        ], 401);
+        $user->currentAccessToken()->delete();
 
+        return $this->success(
+            'Logout successfully.'
+        );
     }
-
 }
